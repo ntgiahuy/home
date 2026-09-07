@@ -110,29 +110,15 @@
       </div>
       <div class="row">
         <button type="button" class="btn" id="btn-issue">Tạo mã</button>
-        <button type="button" class="btn ghost" id="btn-publish">Đăng mã lên GitHub</button>
         <button type="button" class="btn ghost" id="btn-send">Gửi mã</button>
         <button type="button" class="btn ghost" id="btn-copy">Copy mã</button>
       </div>
-      <label for="out">Mã ngắn giao khách (13 ký tự)</label>
-      <textarea id="out" readonly placeholder="GH1.XXXXXXXXX" rows="2"></textarea>
-      <label for="out-full" style="margin-top:0.7rem">Mã dài (sao lưu / kỹ thuật)</label>
-      <textarea id="out-full" readonly placeholder="GH1.<payload>.<chữ ký>" rows="3"></textarea>
+      <label for="out">Mã thành viên</label>
+      <textarea id="out" readonly placeholder="GH1...."></textarea>
       <p class="msg" id="issue-msg"></p>
-      <div class="grid2" style="margin-top:0.8rem">
-        <div>
-          <label for="gh-token">GitHub PAT (để Đăng mã lên repo home)</label>
-          <input id="gh-token" type="password" placeholder="ghp_..." autocomplete="off" />
-        </div>
-        <div>
-          <label for="gh-repo">Repo</label>
-          <input id="gh-repo" type="text" value="ntgiahuy/home" />
-        </div>
-      </div>
       <p class="lead" style="margin:0.55rem 0 0;font-size:0.85rem">
-        <strong>Mã ngắn:</strong> dạng <span class="mono">GH1.XXXXXXXXX</span> (đúng 13 ký tự in hoa).
-        Sau khi Tạo mã → <strong>Đăng mã lên GitHub</strong> (tạo file <span class="mono">thanh-vien/codes/…json</span>) → Gửi mã cho khách.
-        Khách kích hoạt bằng mã ngắn; hệ thống tự lấy license đầy đủ từ file đó.
+        <strong>Gửi mã:</strong> nhập email khách → Tạo mã → Gửi mã (mở app Mail trên máy, bạn bấm Send).
+        Muốn gửi tự động không mở Mail cần dịch vụ email (EmailJS / Cloudflare Worker).
       </p>
     </section>
 
@@ -342,74 +328,6 @@
         if (opt && opt.dataset.days) document.getElementById("days").value = opt.dataset.days;
       });
 
-      var outFullEl = document.getElementById("out-full");
-      var TOKEN_STORE = "giahuy.membership.admin.ghToken";
-      var REPO_STORE = "giahuy.membership.admin.ghRepo";
-      var lastIssued = null;
-      var SHORT_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-      function randomShortCode() {
-        var bytes = crypto.getRandomValues(new Uint8Array(9));
-        var out = "GH1.";
-        for (var i = 0; i < 9; i++) out += SHORT_ALPHABET[bytes[i] % SHORT_ALPHABET.length];
-        return out;
-      }
-
-      function codeFilePayload(shortCode, license, payload) {
-        return {
-          v: 1,
-          code: shortCode,
-          license: license,
-          plan: payload.plan,
-          email: payload.email || "",
-          exp: payload.exp,
-          iat: payload.iat,
-        };
-      }
-
-      async function publishCodeFile(shortCode, license, payload) {
-        var token = document.getElementById("gh-token").value.trim();
-        var repo = document.getElementById("gh-repo").value.trim() || "ntgiahuy/home";
-        if (!token) throw new Error("Nhập GitHub PAT để đăng mã.");
-        localStorage.setItem(TOKEN_STORE, token);
-        localStorage.setItem(REPO_STORE, repo);
-        var path = "thanh-vien/codes/" + shortCode + ".json";
-        var bodyObj = codeFilePayload(shortCode, license, payload);
-        var content = btoa(unescape(encodeURIComponent(JSON.stringify(bodyObj, null, 2))));
-        var api = "https://api.github.com/repos/" + repo + "/contents/" + path;
-        var sha = null;
-        var cur = await fetch(api, {
-          headers: {
-            Accept: "application/vnd.github+json",
-            Authorization: "Bearer " + token,
-          },
-        });
-        if (cur.ok) {
-          var curJson = await cur.json();
-          sha = curJson.sha || null;
-        }
-        var putBody = {
-          message: "Add short membership code " + shortCode,
-          content: content,
-          branch: "main",
-        };
-        if (sha) putBody.sha = sha;
-        var put = await fetch(api, {
-          method: "PUT",
-          headers: {
-            Accept: "application/vnd.github+json",
-            Authorization: "Bearer " + token,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(putBody),
-        });
-        var putJson = await put.json().catch(function () { return {}; });
-        if (!put.ok) {
-          throw new Error((putJson && putJson.message) || "Không đăng được file lên GitHub.");
-        }
-        return path;
-      }
-
       document.getElementById("btn-issue").addEventListener("click", async function () {
         try {
           if (!privateCryptoKey || !importedPrivJwk) throw new Error("Chưa import private key.");
@@ -437,6 +355,7 @@
           var sigBytes = new Uint8Array(sigBuf);
           var license = "GH1." + payloadB64 + "." + GiaHuyMembership.bytesToB64url(sigBytes);
 
+          // Self-check với public suy ra từ private (không phụ thuộc CDN)
           var localPub = await crypto.subtle.importKey(
             "jwk",
             publicFromPrivate(importedPrivJwk),
@@ -452,55 +371,30 @@
           );
           if (!localOk) throw new Error("Ký local thất bại — private JWK có thể hỏng.");
 
+          // Kiểm tra đường xác minh thật (CDN public)
           await GiaHuyMembership.verifyLicense(license);
 
-          var shortCode = randomShortCode();
-          lastIssued = { shortCode: shortCode, license: license, payload: payload };
-          outEl.value = shortCode;
-          outFullEl.value = license;
+          outEl.value = license;
           setIssueMsg(
             true,
-            "Đã tạo mã ngắn " +
-              shortCode +
-              " · hết hạn " +
+            "Đã tạo mã · hết hạn " +
               new Date(payload.exp * 1000).toLocaleString("vi-VN") +
-              " · bấm Đăng mã lên GitHub trước khi gửi khách"
+              " · chữ ký OK"
           );
         } catch (err) {
           setIssueMsg(false, err.message || "Không tạo được mã.");
         }
       });
 
-      document.getElementById("btn-publish").addEventListener("click", async function () {
-        try {
-          if (!lastIssued) throw new Error("Chưa có mã — bấm Tạo mã trước.");
-          var path = await publishCodeFile(
-            lastIssued.shortCode,
-            lastIssued.license,
-            lastIssued.payload
-          );
-          setIssueMsg(
-            true,
-            "Đã đăng " +
-              path +
-              " · đợi Pages ~1 phút rồi gửi mã ngắn " +
-              lastIssued.shortCode +
-              " cho khách"
-          );
-        } catch (err) {
-          setIssueMsg(false, err.message || "Không đăng mã được.");
-        }
-      });
-
       document.getElementById("btn-copy").addEventListener("click", async function () {
         if (!outEl.value) return;
         await navigator.clipboard.writeText(outEl.value);
-        setIssueMsg(true, "Đã copy mã ngắn vào clipboard.");
+        setIssueMsg(true, "Đã copy mã vào clipboard.");
       });
 
       document.getElementById("btn-send").addEventListener("click", function () {
         var email = document.getElementById("email").value.trim();
-        var shortCode = outEl.value.trim();
+        var license = outEl.value.trim();
         var planEl = document.getElementById("plan");
         var planLabel = planEl.selectedOptions[0]
           ? planEl.selectedOptions[0].textContent
@@ -515,28 +409,36 @@
           document.getElementById("email").focus();
           return;
         }
-        if (!shortCode) {
+        if (!license) {
           setIssueMsg(false, "Chưa có mã — bấm Tạo mã trước.");
           return;
         }
         var expText = "";
         try {
-          if (lastIssued && lastIssued.payload && lastIssued.payload.exp) {
-            expText = new Date(lastIssued.payload.exp * 1000).toLocaleString("vi-VN");
+          var mid = license.split(".")[1];
+          if (mid) {
+            var json = JSON.parse(
+              new TextDecoder().decode(GiaHuyMembership.b64urlToBytes(mid))
+            );
+            if (json && json.exp) {
+              expText = new Date(json.exp * 1000).toLocaleString("vi-VN");
+            }
           }
-        } catch (e) {}
+        } catch (e) {
+          /* optional */
+        }
         var subject = "Mã thành viên GIAHUY — " + planLabel;
         var body =
           "Xin chào,\n\n" +
           "Mã thành viên GIAHUY của bạn:\n\n" +
-          shortCode +
+          license +
           "\n\n" +
           "Gói: " +
           planLabel +
           (expText ? "\nHết hạn: " + expText : "") +
           "\n\nCách kích hoạt:\n" +
           "1) Mở https://ntgiahuy.github.io/home/thanh-vien/#kich-hoat\n" +
-          "2) Dán mã ngắn → bấm Kích hoạt\n" +
+          "2) Dán mã → bấm Kích hoạt\n" +
           "3) Vào https://ntgiahuy.github.io/home/ để dùng Móng / Cột / Dầm\n\n" +
           "Trân trọng,\nGIAHUY";
         var href =
@@ -549,13 +451,6 @@
         window.location.href = href;
         setIssueMsg(true, "Đã mở app Mail tới " + email + " — kiểm tra rồi bấm Gửi.");
       });
-
-      try {
-        var tok = localStorage.getItem(TOKEN_STORE);
-        if (tok) document.getElementById("gh-token").value = tok;
-        var repoSaved = localStorage.getItem(REPO_STORE);
-        if (repoSaved) document.getElementById("gh-repo").value = repoSaved;
-      } catch (e) {}
 
       try {
         var saved = localStorage.getItem(PRIV_STORE);

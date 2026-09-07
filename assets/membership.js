@@ -1,8 +1,7 @@
 /**
  * GiaHuy.Net — thành viên trả phí theo thời gian (dùng chung cho cot / mong / dam).
  *
- * License dài: GH1.<payload_b64url>.<sig_b64url>
- * Mã ngắn (13 ký tự in hoa): GH1.XXXXXXXXX — tra cứu file thanh-vien/codes/<mã>.json rồi xác minh license đầy đủ.
+ * License: GH1.<payload_b64url>.<sig_b64url>
  * payload JSON: { v:1, email, plan, iat, exp, apps:["*"] }
  * Chữ ký: ECDSA P-256 + SHA-256 (Web Crypto), xác minh bằng public JWK trên CDN.
  *
@@ -60,44 +59,9 @@
     "https://ntgiahuy.github.io/home/thanh-vien/public-jwk.json"
   );
   var ACTIVATE_URL = resolveAsset("../thanh-vien/", "https://ntgiahuy.github.io/home/thanh-vien/");
-  var CODES_BASE = resolveAsset("../thanh-vien/codes/", "https://ntgiahuy.github.io/home/thanh-vien/codes/");
 
   var cachedJwk = null;
   var cachedKey = null;
-
-  /** Mã ngắn giao khách: GH1. + 9 ký tự A-Z0-9 (không I,O,0,1) = đúng 13 ký tự. */
-  function isShortCode(raw) {
-    return /^GH1\.[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{9}$/.test(String(raw || "").trim().toUpperCase());
-  }
-
-  function normalizeCode(raw) {
-    return String(raw || "").trim().replace(/\s+/g, "").toUpperCase();
-  }
-
-  async function resolveLicenseKey(raw) {
-    var original = String(raw || "").trim().replace(/\s+/g, "");
-    if (!original) throw new Error("Chưa nhập mã thành viên.");
-    var shortKey = normalizeCode(original);
-    // License dài GH1.<payload>.<sig> — giữ nguyên chữ hoa/thường (base64url).
-    if (original.split(".").length === 3 && original.slice(0, 4) === "GH1." && !isShortCode(shortKey)) {
-      return original;
-    }
-    if (!isShortCode(shortKey)) {
-      throw new Error("Mã không đúng định dạng. Dùng mã ngắn GH1.XXXXXXXXX (13 ký tự) hoặc mã dài GH1....");
-    }
-    var url = CODES_BASE.replace(/\/?$/, "/") + encodeURIComponent(shortKey) + ".json";
-    var res = await fetch(url, { cache: "no-cache" });
-    if (!res.ok) {
-      throw new Error("Không tìm thấy mã ngắn trên máy chủ (cần đăng file codes/" + shortKey + ".json).");
-    }
-    var data = await res.json();
-    var license = data && (data.license || data.l);
-    if (!license || String(license).indexOf("GH1.") !== 0) {
-      throw new Error("File mã ngắn không hợp lệ.");
-    }
-    return String(license).trim().replace(/\s+/g, "");
-  }
-
 
   function b64urlToBytes(s) {
     var pad = s.length % 4 === 0 ? "" : "=".repeat(4 - (s.length % 4));
@@ -207,12 +171,11 @@
 
   async function verifyLicense(raw, opts) {
     opts = opts || {};
-    var license = await resolveLicenseKey(raw);
-    var localPayload = await verifyLicenseLocal(license, opts);
+    var localPayload = await verifyLicenseLocal(raw, opts);
     var onlineUrl = opts.verifyUrl || VERIFY_URL;
     if (onlineUrl) {
       // Server là nguồn quyết định khi đã cấu hình Worker
-      return await verifyLicenseOnline(license, opts);
+      return await verifyLicenseOnline(raw, opts);
     }
     return localPayload;
   }
@@ -279,9 +242,8 @@
 
   async function activate(licenseKey, opts) {
     opts = opts || {};
-    var license = await resolveLicenseKey(licenseKey);
-    var payload = await verifyLicense(license, opts);
-    var st = statusFromPayload(payload, license);
+    var payload = await verifyLicense(licenseKey, opts);
+    var st = statusFromPayload(payload, String(licenseKey).trim().replace(/\s+/g, ""));
     writeStored({ license: st.license, checkedAt: Date.now(), status: st });
     return st;
   }
@@ -478,9 +440,5 @@
     canUseApps: canUseApps,
     bytesToB64url: bytesToB64url,
     b64urlToBytes: b64urlToBytes,
-    isShortCode: isShortCode,
-    normalizeCode: normalizeCode,
-    resolveLicenseKey: resolveLicenseKey,
-    CODES_BASE: CODES_BASE,
   };
 })(typeof window !== "undefined" ? window : globalThis);
