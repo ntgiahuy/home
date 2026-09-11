@@ -1,16 +1,17 @@
 # Thành viên trả phí theo thời gian — hướng dẫn
 
-Một mã thành viên (`GH1....`) mở khóa **Xuất PDF / CAD** trên cả 3 tiện ích trong thời hạn còn hiệu lực:
+Một mã thành viên (`GH1....`) mở khóa **Xuất PDF / CAD** trên các tiện ích shop thép trong thời hạn còn hiệu lực:
 
 | Tiện ích | URL |
 |----------|-----|
 | Cột | https://ntgiahuy.github.io/cot/ |
 | Móng | https://ntgiahuy.github.io/mong/ |
 | Dầm | https://ntgiahuy.github.io/dam/ |
+| Sàn | https://ntgiahuy.github.io/san/ |
 
 CDN (repo này): https://ntgiahuy.github.io/home/thanh-vien/
 
-**Trang chủ dùng cả 3 tiện ích:** https://ntgiahuy.github.io/home/  
+**Trang chủ dùng các tiện ích shop thép:** https://ntgiahuy.github.io/home/  
 Dùng thử 10 phút / 1 lần → hết giờ chọn gói 3 tháng · 6 tháng · 1 năm · 2 năm · 3 năm · 5 năm · vĩnh viễn.
 
 > **Repo đang Public?** Đọc [BAO-MAT.md](./BAO-MAT.md) — phải đổi `cot` / `mong` / `dam` sang **Private**, rồi gắn khóa Xuất PDF. Chỉ để Public thì người khác tải mã và bỏ khóa được.

@@ -16,7 +16,7 @@
   var STORAGE_KEY = "giahuy.membership.v1";
   var TRIAL_KEY = "giahuy.trial.v1";
   var TRIAL_MS = 10 * 60 * 1000; // 10 phút, dùng 1 lần / trình duyệt
-  var ALL_APPS = ["cot", "mong", "dam"];
+  var ALL_APPS = ["cot", "mong", "dam", "san"];
   var PLANS = [
     { id: "3m", label: "3 tháng", days: 90 },
     { id: "6m", label: "6 tháng", days: 180 },
