@@ -1,5 +1,5 @@
 {
-  "trialMinutes": 10,
+  "trialMinutes": 30,
   "trialOnce": true,
   "plans": [
     {
@@ -71,5 +71,6 @@
       "blurb": "Sắp ra mắt",
       "comingSoon": true
     }
-  ]
+  ],
+  "trialAllowPdf": false
 }

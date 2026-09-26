@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GIAHUYⓒ — Móng · Cột · Dầm · Sàn · Vách</title>
-  <meta name="description" content="Shop thép móng, cột, dầm (sàn & vách sắp có). Dùng thử 10 phút, tiếp tục bằng thành viên theo quý / năm / vĩnh viễn." />
+  <meta name="description" content="Shop thép móng, cột, dầm (sàn & vách sắp có). Dùng thử xem shop (mặc định 30 phút). Thành viên mới được Xuất PDF." />
   <link rel="icon" href="/home/app/favicon.ico" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -273,8 +273,8 @@
       </div>
       <div class="gate" id="gate">
         <div class="card">
-          <h1>Dùng thử 10 phút — một lần</h1>
-          <p>Mở cả ba tiện ích shop thép trên cùng một trang. Hết 10 phút hoặc đã dùng thử rồi thì cần thành viên trả phí để tiếp tục.</p>
+          <h1 id="gate-title">Dùng thử <span id="trial-mins-label">30</span> phút — một lần</h1>
+          <p id="gate-lead">Xem các tiện ích shop thép trên cùng một trang. Dùng thử <strong>không Xuất PDF</strong>. Hết giờ hoặc đã dùng rồi thì đăng ký thành viên để tiếp tục / xuất file.</p>
           <div class="cta-row">
             <button type="button" class="btn btn-primary" id="btn-start-trial">Bắt đầu dùng thử</button>
             <button type="button" class="btn btn-ghost" id="btn-have-code">Đã có mã thành viên</button>
@@ -357,6 +357,16 @@
               cfg.plans.forEach(function (p) {
                 PLAN_PRICES[p.id] = p.price;
               });
+            }
+            if (typeof GiaHuyMembership.configureFromPlans === "function") {
+              GiaHuyMembership.configureFromPlans(cfg);
+              var mins = GiaHuyMembership.getTrialMinutes();
+              var label = document.getElementById("trial-mins-label");
+              if (label) label.textContent = String(mins);
+              var gateTitle = document.getElementById("gate-title");
+              if (gateTitle && !label) {
+                gateTitle.textContent = "Dùng thử " + mins + " phút — một lần";
+              }
             }
           }
         } catch (e) {
@@ -524,9 +534,10 @@
           if (frames[k].src) frames[k].src = "about:blank";
         });
         if (kind === "trial_used") {
-          els.paywallTitle.textContent = "Đã hết 10 phút dùng thử";
+          els.paywallTitle.textContent =
+            "Đã hết " + GiaHuyMembership.getTrialMinutes() + " phút dùng thử";
           els.paywallLead.textContent =
-            "Lượt dùng thử chỉ một lần trên trình duyệt này. Đăng ký thành viên theo quý / năm / vĩnh viễn để tiếp tục dùng cả ba tiện ích.";
+            "Lượt dùng thử chỉ một lần trên trình duyệt này. Đăng ký thành viên để tiếp tục xem shop và Xuất PDF.";
         } else {
           els.paywallTitle.textContent = "Đăng ký thành viên để tiếp tục";
           els.paywallLead.textContent =
@@ -543,11 +554,31 @@
         selectApp(currentApp);
       }
 
+
+      async function broadcastMembershipToFrames() {
+        var exp = await GiaHuyMembership.canExportPdf();
+        var access = await GiaHuyMembership.canUseApps();
+        var msg = {
+          type: "giahuy-membership-status",
+          canExportPdf: !!exp.ok,
+          mode: access.mode,
+          trialMinutes: GiaHuyMembership.getTrialMinutes(),
+        };
+        Object.keys(frames).forEach(function (k) {
+          try {
+            if (frames[k] && frames[k].contentWindow) {
+              frames[k].contentWindow.postMessage(msg, "*");
+            }
+          } catch (e) {}
+        });
+      }
+
       async function refresh() {
         var access = await GiaHuyMembership.canUseApps();
         setChip(access.mode, access);
         if (access.allowed) {
           showWorkspace();
+          broadcastMembershipToFrames();
           return access;
         }
         if (access.mode === "trial_used") showPaywall("trial_used");

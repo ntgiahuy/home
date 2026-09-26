@@ -122,8 +122,37 @@
       </p>
     </section>
 
+
     <section class="panel">
-      <h2>3. Cấu hình thanh toán công khai</h2>
+      <h2>3. Thời gian dùng thử (phút)</h2>
+      <p class="lead" style="margin-top:0">
+        Khách xem shop trong thời gian dùng thử; <strong>không được Xuất PDF</strong>.
+        Chỉ thành viên còn hạn mới xuất file. Lưu vào <span class="mono">plans.json</span>.
+      </p>
+      <div class="grid2">
+        <div>
+          <label for="trial-minutes">Số phút dùng thử</label>
+          <input id="trial-minutes" type="number" min="1" max="1440" value="30" />
+        </div>
+        <div>
+          <label for="gh-token">GitHub PAT (để lưu lên repo home)</label>
+          <input id="gh-token" type="password" placeholder="ghp_..." autocomplete="off" />
+        </div>
+      </div>
+      <div class="grid2">
+        <div>
+          <label for="gh-repo">Repo</label>
+          <input id="gh-repo" type="text" value="ntgiahuy/home" />
+        </div>
+        <div style="display:flex;align-items:flex-end">
+          <button type="button" class="btn" id="btn-save-trial">Lưu thời gian dùng thử</button>
+        </div>
+      </div>
+      <p class="msg" id="trial-msg"></p>
+    </section>
+
+    <section class="panel">
+      <h2>4. Cấu hình thanh toán công khai</h2>
       <p class="lead" style="margin-top:0">Sửa <span class="mono">pay-config.json</span> trên repo rồi commit.</p>
       <pre class="mono" style="white-space:pre-wrap;margin:0">{
   "bank": "Sacombank",
@@ -451,6 +480,86 @@
         window.location.href = href;
         setIssueMsg(true, "Đã mở app Mail tới " + email + " — kiểm tra rồi bấm Gửi.");
       });
+
+
+      var TOKEN_STORE = "giahuy.membership.admin.ghToken";
+      var REPO_STORE = "giahuy.membership.admin.ghRepo";
+      var trialMsg = document.getElementById("trial-msg");
+      function setTrialMsg(ok, text) {
+        trialMsg.className = "msg " + (ok ? "ok" : "bad");
+        trialMsg.textContent = text || "";
+      }
+
+      async function loadTrialConfig() {
+        try {
+          var res = await fetch("./plans.json", { cache: "no-cache" });
+          if (!res.ok) return;
+          var cfg = await res.json();
+          if (cfg.trialMinutes) document.getElementById("trial-minutes").value = cfg.trialMinutes;
+        } catch (e) {}
+      }
+
+      document.getElementById("btn-save-trial").addEventListener("click", async function () {
+        try {
+          var minutes = Number(document.getElementById("trial-minutes").value);
+          if (!minutes || minutes < 1) throw new Error("Số phút không hợp lệ (tối thiểu 1).");
+          if (minutes > 1440) throw new Error("Tối đa 1440 phút (24 giờ).");
+          var token = document.getElementById("gh-token").value.trim();
+          var repo = document.getElementById("gh-repo").value.trim() || "ntgiahuy/home";
+          if (!token) throw new Error("Nhập GitHub PAT để lưu lên repo.");
+          localStorage.setItem(TOKEN_STORE, token);
+          localStorage.setItem(REPO_STORE, repo);
+
+          var path = "thanh-vien/plans.json";
+          var api = "https://api.github.com/repos/" + repo + "/contents/" + path;
+          var cur = await fetch(api, {
+            headers: {
+              Accept: "application/vnd.github+json",
+              Authorization: "Bearer " + token,
+            },
+          });
+          if (!cur.ok) throw new Error("Không đọc được plans.json trên GitHub.");
+          var curJson = await cur.json();
+          var raw = decodeURIComponent(escape(atob(curJson.content.replace(/\n/g, ""))));
+          var cfg = JSON.parse(raw);
+          cfg.trialMinutes = Math.floor(minutes);
+          cfg.trialOnce = cfg.trialOnce !== false;
+          cfg.trialAllowPdf = false;
+          var content = btoa(unescape(encodeURIComponent(JSON.stringify(cfg, null, 2) + "\n")));
+          var put = await fetch(api, {
+            method: "PUT",
+            headers: {
+              Accept: "application/vnd.github+json",
+              Authorization: "Bearer " + token,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              message: "Set trialMinutes=" + cfg.trialMinutes,
+              content: content,
+              sha: curJson.sha,
+              branch: "main",
+            }),
+          });
+          var putJson = await put.json().catch(function () { return {}; });
+          if (!put.ok) throw new Error((putJson && putJson.message) || "Không lưu được plans.json.");
+          if (typeof GiaHuyMembership.setTrialMinutes === "function") {
+            GiaHuyMembership.setTrialMinutes(cfg.trialMinutes);
+            GiaHuyMembership.setTrialAllowPdf(false);
+          }
+          setTrialMsg(true, "Đã lưu dùng thử " + cfg.trialMinutes + " phút · không Xuất PDF khi dùng thử · đợi Pages ~1 phút.");
+        } catch (err) {
+          setTrialMsg(false, err.message || "Lưu thất bại.");
+        }
+      });
+
+      try {
+        var tok = localStorage.getItem(TOKEN_STORE);
+        if (tok) document.getElementById("gh-token").value = tok;
+        var repoSaved = localStorage.getItem(REPO_STORE);
+        if (repoSaved) document.getElementById("gh-repo").value = repoSaved;
+      } catch (e) {}
+      loadTrialConfig();
+
 
       try {
         var saved = localStorage.getItem(PRIV_STORE);

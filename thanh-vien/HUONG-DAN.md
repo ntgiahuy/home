@@ -12,7 +12,7 @@ Một mã thành viên (`GH1....`) mở khóa **Xuất PDF / CAD** trên các ti
 CDN (repo này): https://ntgiahuy.github.io/home/thanh-vien/
 
 **Trang chủ dùng các tiện ích shop thép:** https://ntgiahuy.github.io/home/  
-Dùng thử 10 phút / 1 lần → hết giờ chọn gói 3 tháng · 6 tháng · 1 năm · 2 năm · 3 năm · 5 năm · vĩnh viễn.
+Dùng thử (mặc định 30 phút, chỉnh trong Admin) / 1 lần — xem shop, không Xuất PDF → hết giờ chọn gói thành viên.
 
 > **Repo đang Public?** Đọc [BAO-MAT.md](./BAO-MAT.md) — phải đổi `cot` / `mong` / `dam` sang **Private**, rồi gắn khóa Xuất PDF. Chỉ để Public thì người khác tải mã và bỏ khóa được.
 

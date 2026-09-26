@@ -15,8 +15,34 @@
 
   var STORAGE_KEY = "giahuy.membership.v1";
   var TRIAL_KEY = "giahuy.trial.v1";
-  var TRIAL_MS = 10 * 60 * 1000; // 10 phút, dùng 1 lần / trình duyệt
+  var TRIAL_MS = 30 * 60 * 1000; // mặc định 30 phút; Admin chỉnh qua plans.json
+  var TRIAL_ALLOW_PDF = false; // dùng thử không được Xuất PDF
   var ALL_APPS = ["cot", "mong", "dam", "san"];
+
+  function getTrialMinutes() {
+    return Math.max(1, Math.round(TRIAL_MS / 60000));
+  }
+
+  function setTrialMinutes(minutes) {
+    var n = Number(minutes);
+    if (!n || n < 1) n = 30;
+    if (n > 24 * 60) n = 24 * 60;
+    TRIAL_MS = Math.floor(n) * 60 * 1000;
+    return getTrialMinutes();
+  }
+
+  function setTrialAllowPdf(allow) {
+    TRIAL_ALLOW_PDF = !!allow;
+    return TRIAL_ALLOW_PDF;
+  }
+
+  function configureFromPlans(cfg) {
+    if (!cfg || typeof cfg !== "object") return getTrialMinutes();
+    if (cfg.trialMinutes != null) setTrialMinutes(cfg.trialMinutes);
+    if (cfg.trialAllowPdf != null) setTrialAllowPdf(cfg.trialAllowPdf);
+    return getTrialMinutes();
+  }
+
   var PLANS = [
     { id: "3m", label: "3 tháng", days: 90 },
     { id: "6m", label: "6 tháng", days: 180 },
@@ -277,6 +303,22 @@
     opts = opts || {};
     var st = await getStatus(opts);
     if (st.active && coversApp(st, opts.app)) return st;
+    var trial = getTrialStatus();
+    if (trial.active && !TRIAL_ALLOW_PDF) {
+      if (typeof opts.onLocked === "function") {
+        opts.onLocked(st, { reason: "trial_no_pdf", trial: trial });
+        return null;
+      }
+      var goTrial = global.confirm(
+        "Đang dùng thử — không được " +
+          (opts.feature || "Xuất PDF") +
+          ".\n\nĐăng ký thành viên để mở khóa xuất file?"
+      );
+      if (goTrial) {
+        global.open(opts.activateUrl || ACTIVATE_URL, "_blank", "noopener,noreferrer");
+      }
+      return null;
+    }
     if (typeof opts.onLocked === "function") {
       opts.onLocked(st);
       return null;
@@ -332,7 +374,7 @@
     localStorage.setItem(TRIAL_KEY, JSON.stringify(record));
   }
 
-  /** Trạng thái dùng thử 10 phút / 1 lần trên trình duyệt này. */
+  /** Trạng thái dùng thử / 1 lần trên trình duyệt này. */
   function getTrialStatus() {
     var t = readTrial();
     var now = Date.now();
@@ -373,7 +415,7 @@
       return {
         ok: false,
         status: st,
-        error: "Bạn đã dùng hết lượt dùng thử 10 phút trên trình duyệt này. Hãy đăng ký thành viên để tiếp tục.",
+        error: "Bạn đã dùng hết lượt dùng thử " + getTrialMinutes() + " phút trên trình duyệt này. Hãy đăng ký thành viên để tiếp tục.",
       };
     }
     var record = { startedAt: now, endsAt: now + TRIAL_MS, version: 1 };
@@ -396,7 +438,18 @@
     return (m < 10 ? "0" : "") + m + ":" + (r < 10 ? "0" : "") + r;
   }
 
-  /** Thành viên còn hạn HOẶC đang trong 10 phút dùng thử. */
+  async function canExportPdf(opts) {
+    opts = opts || {};
+    var st = await getStatus(opts);
+    if (st.active && coversApp(st, opts.app)) return { ok: true, status: st };
+    return {
+      ok: false,
+      status: st,
+      reason: getTrialStatus().active ? "trial_no_pdf" : "no_membership",
+    };
+  }
+
+  /** Thành viên còn hạn HOẶC đang dùng thử (chỉ xem shop). Xuất PDF cần thành viên. */
   async function canUseApps(opts) {
     opts = opts || {};
     var member = await getStatus(opts);
@@ -418,7 +471,14 @@
   global.GiaHuyMembership = {
     STORAGE_KEY: STORAGE_KEY,
     TRIAL_KEY: TRIAL_KEY,
-    TRIAL_MS: TRIAL_MS,
+    get TRIAL_MS() {
+      return TRIAL_MS;
+    },
+    getTrialMinutes: getTrialMinutes,
+    setTrialMinutes: setTrialMinutes,
+    setTrialAllowPdf: setTrialAllowPdf,
+    configureFromPlans: configureFromPlans,
+    canExportPdf: canExportPdf,
     ALL_APPS: ALL_APPS,
     PLANS: PLANS,
     ACTIVATE_URL: ACTIVATE_URL,
