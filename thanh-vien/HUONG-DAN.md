@@ -75,10 +75,10 @@ Sửa `thanh-vien/pay-config.json` rồi commit/push:
 
 ```json
 {
-  "bank": "Sacombank",
+  "bank": "Ngân hàng BIDV",
   "account": "0362118138",
   "holder": "NGUYEN THANH NHAT",
-  "note": "Nội dung CK: GH TV + gói + email",
+  "note": "Nội dung CK: GH + gói + email",
   "email": "nhatxd@icloud.com",
   "zalo": ""
 }

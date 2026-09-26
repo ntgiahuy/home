@@ -374,7 +374,7 @@
         <div class="step">
           <div>
             <strong>Chọn gói và chuyển khoản</strong>
-            <p id="pay-hint">Nội dung CK gợi ý: <span class="mono" id="transfer-content">GH TV 3M email@cua.ban</span>. Điền STK của bạn ở trang Admin (cấu hình).</p>
+            <p id="pay-hint">Nội dung CK gợi ý: <span class="mono" id="transfer-content">GH 3M email@cua.ban</span>. Điền STK của bạn ở trang Admin (cấu hình).</p>
           </div>
         </div>
         <div class="step">
@@ -438,7 +438,7 @@
       function updateTransferHint() {
         var email = "email@cua.ban";
         transferContent.textContent =
-          "GH TV " + selected.plan.toUpperCase() + " " + email + " · " + money(selected.price);
+          "GH " + selected.plan.toUpperCase() + " " + email + " · " + money(selected.price);
       }
 
       document.querySelectorAll(".pick-plan").forEach(function (btn) {
@@ -462,7 +462,7 @@
           if (!cfg || !cfg.bank) return;
           payInfo.textContent =
             (cfg.bank || "") +
-            " · STK " +
+            " · STK: " +
             (cfg.account || "") +
             " · " +
             (cfg.holder || "") +
